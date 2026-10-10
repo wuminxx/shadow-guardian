@@ -59,8 +59,8 @@ AI 客户端把**完整对话明文写到磁盘**。这不是猜测，是默认�
 **方式一：Python 工具（推荐）**
 
 ```bash
-git clone https://github.com/wuminxx/ai-opsec-privacy.git
-cd ai-opsec-privacy
+git clone https://github.com/wuminxx/shadow-guardian.git
+cd shadow-guardian
 pip install -e tool/
 
 aiopsec audit                        # 1. 全量体检，看评分和整改清单
@@ -87,8 +87,8 @@ cat app.log | ./scripts/redact.sh        # 脱敏
 **方式三：只给 AI 用**
 
 ```bash
-cp -r . ~/.claude/skills/ai-opsec-privacy/
-# 之后 /ai-opsec-privacy，或提到 AI 隐私/OPSEC/本地模型/会话清理 时自动触发
+cp -r . ~/.claude/skills/shadow-guardian/
+# 之后 /shadow-guardian，或提到 AI 隐私/OPSEC/本地模型/会话清理 时自动触发
 ```
 
 ---
@@ -96,7 +96,7 @@ cp -r . ~/.claude/skills/ai-opsec-privacy/
 ## 目录
 
 ```
-ai-opsec-privacy/
+shadow-guardian/
 ├── README.md
 ├── SKILL.md                      Claude Code Skill（给 AI 读的规程）
 ├── LICENSE                       MIT
@@ -150,7 +150,7 @@ ai-opsec-privacy/
 |---|---|
 | 有 Python | `tool/` — 功能最全（8 命令、JSON 输出、hook 安装） |
 | 只有 shell | `scripts/` — 核心功能，无依赖 |
-| 只想让 AI 自己遵守 | `SKILL.md` — 拷到 `~/.claude/skills/ai-opsec-privacy/` |
+| 只想让 AI 自己遵守 | `SKILL.md` — 拷到 `~/.claude/skills/shadow-guardian/` |
 
 ---
 

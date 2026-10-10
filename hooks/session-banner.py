@@ -17,10 +17,10 @@ def find_install() -> Path:
     ):
         if not cand:
             continue
-        p = Path(cand) / "skills" / "ai-opsec-privacy"
+        p = Path(cand) / "skills" / "shadow-guardian"
         if p.is_dir():
             return p
-    return Path(os.path.expanduser("~/.claude/skills/ai-opsec-privacy"))
+    return Path(os.path.expanduser("~/.claude/skills/shadow-guardian"))
 
 
 def main():
@@ -36,7 +36,7 @@ def main():
     ]
     existing = [p for p in session_dirs if p.exists()]
 
-    lines = ["[ai-opsec-privacy] 本会话的安全基线提示："]
+    lines = ["[shadow-guardian] 本会话的安全基线提示："]
     lines.append("")
     lines.append("落盘面（会话结束时建议清理）：")
     for p in existing:

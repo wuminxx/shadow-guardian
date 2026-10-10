@@ -68,7 +68,7 @@
 cat app.log | ./scripts/redact.sh > app.clean.log
 
 # 或定义成函数日常用
-redact() { "$HOME/ai-opsec-privacy/scripts/redact.sh"; }
+redact() { "$HOME/shadow-guardian/scripts/redact.sh"; }
 cat app.log | redact | pbcopy      # macOS
 cat app.log | redact | xclip -sel c  # Linux
 ```

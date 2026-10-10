@@ -87,5 +87,5 @@
 - `env` 联网部分依赖 `ipinfo.io`，离线时跳过
 - 无 Python 环境时 shell 版功能较少
 
-[Unreleased]: https://github.com/wuminxx/ai-opsec-privacy/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/wuminxx/ai-opsec-privacy/releases/tag/v1.0.0
+[Unreleased]: https://github.com/wuminxx/shadow-guardian/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/wuminxx/shadow-guardian/releases/tag/v1.0.0

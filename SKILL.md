@@ -1,5 +1,5 @@
 ---
-name: ai-opsec-privacy
+name: shadow-guardian
 description: "用 AI 时零身份暴露、零隐私泄漏的操作规程。覆盖 AI 客户端落盘取证面(会话历史/memory/telemetry)、提示词身份字段清洗、AI 提供商日志与训练留存、本地/自托管模型部署、网络与元数据泄漏、跨会话关联、团队与合规留痕。用于：不想让 AI 会话泄漏真实身份、不想被 AI 厂商留存或训练、想用本地模型彻底断网、需要一套能过审计的 AI 使用规范、评估 Claude/ChatGPT/Cursor/Copilot 等客户端会把什么写到磁盘。Triggers: AI 隐私, OPSEC, 不泄漏身份, 本地模型, 离线 AI, ollama, llama.cpp, vLLM, 会话历史清理, prompt 脱敏, AI 客户端取证, telemetry 关闭, 训练退出。也可直接当 AI 使用安全基线文档用。"
 ---
 

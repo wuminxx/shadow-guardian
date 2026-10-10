@@ -76,7 +76,7 @@ else:
     shutil.copy2(settings_path, bak)
     print("备份:", bak, file=sys.stderr)
 
-MARK = "ai-opsec-privacy"
+MARK = "shadow-guardian"
 hooks = cur.setdefault("hooks", {})
 
 def is_ours(cmd): return MARK in cmd

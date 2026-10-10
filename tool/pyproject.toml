@@ -20,7 +20,7 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/wuminxx/ai-opsec-privacy"
+Homepage = "https://github.com/wuminxx/shadow-guardian"
 
 [project.scripts]
 aiopsec = "aiopsec.__main__:main"
