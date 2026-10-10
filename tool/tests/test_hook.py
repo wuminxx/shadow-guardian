@@ -24,7 +24,7 @@ class TestGuard(unittest.TestCase):
             sys.stdin = old
 
     def test_dirty_blocks(self):
-        rc = self._run_guard(json.dumps({"prompt": "我的手机 13800138000"}))
+        rc = self._run_guard(json.dumps({"prompt": "key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx"}))
         self.assertEqual(rc, 2)
 
     def test_clean_passes(self):
@@ -52,7 +52,7 @@ class TestGuard(unittest.TestCase):
         old = os.environ.get("AIOP_SEC_BLOCK")
         os.environ["AIOP_SEC_BLOCK"] = "NONE"
         try:
-            rc = self._run_guard(json.dumps({"prompt": "我的手机 13800138000"}))
+            rc = self._run_guard(json.dumps({"prompt": "key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx"}))
             self.assertEqual(rc, 0)
         finally:
             if old is None:
@@ -62,7 +62,7 @@ class TestGuard(unittest.TestCase):
 
     def test_non_json_input(self):
         """非 JSON 输入应当不崩。"""
-        rc = self._run_guard("plain text 13800138000")
+        rc = self._run_guard("plain text sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx")
         self.assertIn(rc, (0, 2))
 
 
@@ -102,7 +102,7 @@ class TestLauncher(unittest.TestCase):
         env["PYTHONIOENCODING"] = "utf-8"
         r = subprocess.run(
             [sys.executable, str(p)],
-            input=json.dumps({"prompt": "手机 13800138000"}),
+            input=json.dumps({"prompt": "key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx"}),
             capture_output=True, text=True, timeout=30, env=env,
         )
         self.assertEqual(r.returncode, 2, f"stderr={r.stderr}")

@@ -1,257 +1,196 @@
-# AI OPSEC & Privacy
+# Shadow Guardian
 
-**用 AI 时零身份暴露、零隐私泄漏的工具 + 规程。**
+**用 AI 时零身份暴露、零隐私泄漏。**
 
-一个零依赖的 Python CLI 工具（`aiopsec`）+ 一套可复用的 **Claude Code Skill**。
+一个零依赖的 CLI 工具（`aiopsec`）+ 一份 OPSEC 基线 + 可选的 Claude Code Skill。
 
 ```bash
 pip install -e tool/
+
 aiopsec audit          # 体检：0-100 评分 + 整改清单
-aiopsec scan           # 测绘：你的机器上 AI 留了什么
-aiopsec check -f x.log # 检查：发送前扫身份泄漏
-aiopsec redact < x.log # 脱敏
-aiopsec shred --force  # 清理
-aiopsec env            # 环境指纹一致性
-aiopsec harden --apply # 加固配置
-aiopsec hook --install --apply   # 自动拦截含身份字段的输入
+aiopsec scan           # 查：你的机器上 AI 客户端留了什么
+aiopsec shred --force  # 清：会话痕迹
+aiopsec harden --apply # 加固：关遥测
+aiopsec hook --install --apply   # 自动拦截
 ```
-
-覆盖三层：AI 客户端落盘取证面、提示词身份字段清洗、网络与提供商留存。
-
-```
-L1 会话层   AI 客户端在你机器上写什么、怎么清
-L2 提示词层 你送进去的文本会留下什么
-L3 网络层   出网时谁看得见、留存多久
-```
-
-任一层单独用都不够，三层叠加才够。
 
 ---
 
-## 为什么需要这个
+## 这个项目解决什么
 
-AI 客户端把**完整对话明文写到磁盘**。这不是猜测，是默认行为。
-
-典型落盘面（Claude Code 为例）：
+**一个事实**：AI 客户端把每一轮对话、每次工具调用、每个工具结果，
+**明文写进固定路径**。不是加密、不是临时文件。
 
 ```
-~/.claude/projects/<cwd-slug>/    每次会话完整 transcript（明文 JSONL）
-~/.claude/history.jsonl           你输入过的每一条 prompt
-~/.claude/memory/                 memory 文件（跨会话持久）
-~/.claude/shell-snapshots/        shell 环境快照 —— 含 env 变量、API key！
-~/.claude/todos/                  任务清单
-<project>/.claude/settings.json   项目级配置 —— 会被 git 提交
+~/.claude/projects/<cwd-slug>/*.jsonl    完整 transcript
+~/.claude/history.jsonl                  输入过的每条 prompt
+~/.claude/shell-snapshots/               shell 快照（含环境变量！）
+<project>/.claude/settings.json           项目配置 —— 会被 git 提交
 ```
 
-而送进 LLM 的文本，按**永久留存 + 可能被调取 + 可能进入训练**对待。
+其余是围绕这一件事的检测、清理、加固。
 
-真实案例（2026-10 韩国银行 AI 攻击案）中，攻击方的破点正是这一层：
-
-- 把工作目录开成**公网可读**（`http://38.244.50.120:18899/.claude/CLAUDE.md`）
-- 在 Claude Code 会话里让 AI 写「安全研究员简历」，**顺手写进真实姓名、手机、Telegram、年龄、学校、居住地**
-
-技术层伪装做得很好（12 国 IP、9 个代理、多模型栈），死在最基础的 OPSEC。
+**它不能解决的**：真实姓名/学校/公司/措辞习惯、语义关联、磁盘物理擦除、法律判断。
+**通过检查 ≠ 安全。**
 
 ---
 
-## 快速开始
+## 核心洞察：8 个可关联源
 
-**方式一：Python 工具（推荐）**
+对手不需要破解什么，只需要**对比**。断掉一个源不够——
+要断的是"这些源能否指向同一人"。
 
-```bash
-git clone https://github.com/wuminxx/shadow-guardian.git
-cd shadow-guardian
-pip install -e tool/
-
-aiopsec audit                        # 1. 全量体检，看评分和整改清单
-aiopsec scan                         # 2. 看具体在哪些目录
-cat app.log | aiopsec check          # 3. 发送前检查
-cat app.log | aiopsec redact         #    脱敏
-aiopsec env                          # 4. 环境指纹
-aiopsec harden --apply               # 5. 关遥测 + 加固
-aiopsec hook --install --apply       # 6. 装自动拦截
-aiopsec shred --force                # 7. 清理
+```
+1 基础设施  IP / ASN / 托管商 / 端口 / 证书
+2 时间      时区 / 活跃时段 / 作息
+3 语言      用词 / 拼写 / 措辞习惯 / code-switch
+4 内容      提示词里的身份字段 / 项目代号
+5 账号      邮箱 / 支付 / 昵称 / 跨服务复用
+6 客户端    落盘文件 / telemetry ID / 版本
+7 行为      并发模式 / 节奏 / 工具偏好
+8 关联      跨会话 / 跨账号 / 跨项目同一性
 ```
 
-**方式二：纯 shell（无 Python）**
+2026 年公开的真实案例里，攻击者的技术层伪装都做得很好
+（12 国 IP、9 个代理、多模型栈），栽的都是上面某一源：
+工作目录开成公网读、提示词里写真实身份、账号跨案复用。
 
-```bash
-./scripts/scan.sh                        # Linux/macOS
-.\scripts\scan.ps1                       # Windows
-cat app.log | ./scripts/redact.sh        # 脱敏
-./scripts/check-prompt.sh --file app.log # 检查
-./scripts/install-hooks.sh               # 装 hook
-./scripts/shred.sh                       # 清理（先 DRY-RUN）
+**技术层 AI 能补，人的 OPSEC 补不了。**
+
+---
+
+## 工具
+
+零依赖，Python 3.8+，纯标准库。
+
+| 命令 | 作用 |
+|---|---|
+| `aiopsec audit` | 全量体检 → 0-100 评分 + 逐项扣分 + 整改命令 |
+| `aiopsec scan` | 测绘 30+ 已知落盘路径，标记敏感项 |
+| `aiopsec check` | 扫描凭据/邮箱/内网 IP（文本/文件/目录） |
+| `aiopsec redact` | 脱敏（幂等，支持 `--in-place` / `--dry-run`） |
+| `aiopsec shred` | 清理（默认 DRY-RUN，urandom 覆写 + fsync） |
+| `aiopsec env` | 时区/语言/出口 IP/主机名 一致性 |
+| `aiopsec harden` | 关遥测 + 限制 Copilot（浅合并 + 自动备份） |
+| `aiopsec hook` | 装 Claude Code 拦截 hook |
+
+退出码：`0` 通过 · `1` 发现问题 · `2` 用法错误。可直接接 CI。
+
+### 检测范围（23 条规则，刻意收窄）
+
+**会抓**（真的会贴在给 AI 的文本里）：
+
+```
+secret  17 条  API key（Anthropic/OpenAI/GitHub/AWS/Google/Slack/
+                     GitLab/HF/Stripe）、私钥、Bearer、JWT、连接串
+pii      1 条  邮箱（公司邮箱直接暴露雇主）
+infra    3 条  私有 IPv4、IP:端口、内部主机名
+path     2 条  Windows/Unix 用户路径
 ```
 
-**方式三：只给 AI 用**
+**刻意不抓**：
+
+```
+中国手机号 / 身份证 / 银行卡 / 车牌 / 座机 / Telegram 用户名
+```
+
+原因：这些几乎不会以明文形态出现在给 AI 的文本里，
+但订单号、日志、测试数据都很像 → **误报淹没真信号**。
+真要发这类信息，手工改。
+
+（早期版本有 33 条规则，实测误报率高，已砍掉 10 条。见 CHANGELOG。）
+
+---
+
+## 文档
+
+`docs/opsec-baseline.md` — 一篇，11 节。
+
+包含：落盘面完整清单、提示词卫生、环境指纹、本地模型部署、
+清理的真实局限、三个敏感度档位、8 个可关联源、8 个误区、法律边界。
+
+---
+
+## 作为 Claude Code Skill
 
 ```bash
 cp -r . ~/.claude/skills/shadow-guardian/
-# 之后 /shadow-guardian，或提到 AI 隐私/OPSEC/本地模型/会话清理 时自动触发
 ```
 
----
+之后 `/shadow-guardian`，或提到 AI 隐私 / OPSEC / 会话记录 / 清理时触发。
 
-## 目录
+**Skill 与工具解耦** —— 工具升级不影响 Skill，反之亦然。
 
-```
-shadow-guardian/
-├── README.md
-├── SKILL.md                      Claude Code Skill（给 AI 读的规程）
-├── LICENSE                       MIT
-│
-├── tool/                         ★ 主工具：aiopsec CLI
-│   ├── README.md                 工具文档（完整命令参考）
-│   ├── pyproject.toml            可 pip install
-│   ├── aiopsec/
-│   │   ├── __main__.py           CLI 入口
-│   │   ├── core/
-│   │   │   ├── rules.py          检测规则表（单一数据源）
-│   │   │   ├── engine.py         检测 + 脱敏引擎
-│   │   │   ├── surface.py        落盘取证面测绘
-│   │   │   ├── environment.py    环境指纹一致性
-│   │   │   └── output.py         终端输出
-│   │   └── commands/             8 个子命令
-│   └── tests/                    34 个单元测试（零依赖 unittest）
-│
-├── hooks/                        独立的 hook 脚本（不想装 pip 包时用）
-│   ├── prompt-guard.py           UserPromptSubmit 拦截
-│   ├── session-banner.py         SessionStart 提示
-│   └── settings.snippet.json
-│
-├── scripts/                      纯 shell 版（无 Python 环境时用）
-│   ├── scan.sh / scan.ps1
-│   ├── redact.sh / redact.ps1
-│   ├── check-prompt.sh
-│   ├── shred.sh / shred.ps1
-│   ├── local-model.sh
-│   └── install-hooks.sh
-│
-├── docs/                         规程文档
-│   ├── threat-model.md           先定清楚防谁
-│   ├── forensics-surface.md      各客户端落盘点逐条
-│   ├── prompt-hygiene.md         提示词卫生
-│   ├── providers.md              厂商留存政策检查模板
-│   ├── local-models.md           Ollama / llama.cpp / vLLM + 断网
-│   ├── network.md                网络与元数据泄漏
-│   └── checklist.md              上线前自查
-│
-├── examples/
-│   ├── pseudo-identity.txt       假身份模板 + 一致性检查
-│   └── gitignore.txt             AI 配置 .gitignore + 清史流程
-│
-└── .github/workflows/ci.yml      三平台 × 两 Python 版本 + 功能测试
-```
-
-**三种用法，按环境选一种：**
-
-| 环境 | 用什么 |
-|---|---|
-| 有 Python | `tool/` — 功能最全（8 命令、JSON 输出、hook 安装） |
-| 只有 shell | `scripts/` — 核心功能，无依赖 |
-| 只想让 AI 自己遵守 | `SKILL.md` — 拷到 `~/.claude/skills/shadow-guardian/` |
-
----
-
-## 三层速览
-
-### L1 会话层
+### 运行时拦截（可选）
 
 ```bash
-aiopsec scan                    # 测绘：看看机器上留了什么
-aiopsec harden --apply          # 关遥测
-aiopsec shred                   # 预演清理
-aiopsec shred --force           # 执行
+aiopsec hook --install --apply
 ```
 
-```bash
-# 会话目录挂 tmpfs（Linux）—— 重启即失
-sudo mount -t tmpfs -o size=512m,mode=0700,uid=$(id -u) tmpfs ~/.claude/projects
-```
+装两个 hook：
+- **UserPromptSubmit** — 提交时扫凭据，命中则阻断
+- **SessionStart** — 提示敏感落盘点
 
-> **警告**：SSD + TRIM + 写时复制文件系统（btrfs/ZFS/APFS）下，原地覆写**不保证**擦除旧块。
-> 真正需要时上全盘加密 + 一次性 VM。
+阈值可调：`AIOP_SEC_BLOCK=HIGH|MED|LOW|NONE`
 
-### L2 提示词层
+安装时生成 `~/.claude/aiopsec/hook-*.py` launcher，
+内嵌包路径 —— **不依赖 `pip install -e`**。
 
-```bash
-cat app.log | aiopsec check      # 只检查，退出码 1 = 有泄漏
-cat app.log | aiopsec redact     # 脱敏
-aiopsec check -d ./src           # 递归扫目录
-```
+---
 
-检测 33 规则：Anthropic/OpenAI/GitHub/AWS/Google/Slack key、PEM 私钥、JWT、连接串、
-中国手机号/身份证（带校验位）/车牌、邮箱、银行卡（Luhn）、内网 IP、内部主机名、用户路径。
-
-### L3 网络层
+## 三档用法
 
 ```bash
-aiopsec env                      # 时区/语言/出口IP 是否互相矛盾
-aiopsec env --ip 1.2.3.4         # 查指定 IP 归属
+# 只想要工具
+git clone https://github.com/wuminxx/shadow-guardian
+cd shadow-guardian && pip install -e tool/
+aiopsec audit
 
-# 本地模型，只绑 127.0.0.1，不出网
-./scripts/local-model.sh ollama qwen2.5:14b
-```
+# 无 Python 环境
+./scripts/scan.sh
+cat f | ./scripts/redact.sh
+./scripts/check-prompt.sh --file f
+./scripts/shred.sh --force
 
-```bash
-# 验证不泄漏真实 IP
-curl -s https://api.ipify.org; echo
+# 只想让 AI 遵守
+cp -r . ~/.claude/skills/shadow-guardian/
 ```
 
 ---
 
-## 三个敏感度档位
+## 真实局限
 
-| 档位 | 目标 | 做什么 | 成本 |
-|---|---|---|---|
-| **A 日常** | 防本地取证 | 测绘 + 关遥测 + 脱敏 + 清理脚本 | 低 |
-| **B 敏感** | 防提供商 + 防关联 | A + 零留存渠道 + 假身份 + tmpfs + 无日志代理 | 中 |
-| **C 高敏** | 防国家级 + 断网 | B + 本地模型 + 断网 + 一次性 VM + 全盘加密 | 高 |
-
-决策树：
+写在这里是因为不写就是骗人。
 
 ```
-要处理敏感数据？
-├─ 否 → A：测绘 + 关遥测 + 脱敏 + 清理脚本
-└─ 是 → 数据必须离开本机？
-        ├─ 否 → C：本地模型 + 断网
-        └─ 是 → 必须给第三方？
-                ├─ 否 → C（自托管在你的云）
-                └─ 是 → B：零留存 + 假身份 + 脱敏 + 无日志代理
+正则不覆盖   姓名/学校/公司/职级/措辞习惯/语义关联
+清理不彻底   SSD+TRIM+CoW 下覆写不保证擦除旧块
+不检测       剪贴板历史、备份服务、浏览器 LocalStorage 内容
+本地模型     模型文件、日志、缓存仍在磁盘
+env          联网部分依赖 ipinfo.io，离线时跳过
+离线部署     本地部署 + 本地模型 ⇒ 厂商封号无效
 ```
 
----
-
-## 八个常见误区
-
-| 你以为 | 实际 |
-|---|---|
-| 我删了会话记录 | SSD/CoW 下覆写不保证擦除旧块 → 真需要时上全盘加密 |
-| 我用无痕模式 | 无痕只防本地历史，不防网络观测和服务端留存 |
-| 我关了 memory | 服务端仍可能按账号聚合 → 高敏换账号或自托管 |
-| 我用了代理 | 免费代理本身就是采集点 → 自建无日志 |
-| 我脱敏了姓名 | 措辞习惯/时区/语言组合仍可指纹 → 全维度对齐 locale |
-| 小模型本地跑就安全 | 模型文件、日志、缓存仍在磁盘 → 配全盘加密 + 关请求日志 |
-| API key 存 env 就行 | env 会进 shell snapshot 和进程列表 → 用密钥库 / tmpfs |
-| 换个说法问同样的事就没事 | 语义等价会被聚类 → 事本身不能问时，换说法也不能问 |
+**唯一彻底的方案**：全盘加密 + 一次性 VM。
 
 ---
 
-## 作为 Claude Code Skill 使用
+## 法律边界
 
-见上方"方式三"。Skill 内容在 `SKILL.md`，与工具解耦 —— 工具升级不影响 Skill，反之亦然。
+技术脱敏**不免除**法律义务。
 
-`aiopsec hook --install --apply` 装的是运行时拦截；Skill 是让 AI 主动遵守规程。两者互补。
+向境外模型转发**第三方个人信息**，在《个人信息保护法》下是
+「向第三方提供」+「出境」：
 
----
+```
+第 23 条    单独同意 + 告知接收方名称/联系方式/目的/种类
+第 38~39 条 出境须安全评估 / 认证 / 标准合同之一 + 另行单独同意
+第 55 条    事前个人信息保护影响评估
+第 57 条    发生泄露须通知个人并报告
+```
 
-## 边界
-
-- 本规程只处理**你自己**的隐私与你**有权处置**的数据。
-- 涉及**第三方个人信息**时，向境外模型转发在《个人信息保护法》下属对外提供 + 出境行为，
-  需单独同意 + 安全评估/认证/标准合同之一 + 事前影响评估。**技术脱敏不免除法律义务。**
-- 本仓库不含任何绕过他人授权、伪造他人身份的内容 —— 目标是保护使用者自己。
+脱敏后再发给境外模型，**法律上仍是同一件事**。
+自托管解决"出不出网"，不解决"该不该处理"。
 
 ---
 

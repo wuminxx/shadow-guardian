@@ -52,25 +52,6 @@ class TestSecrets(unittest.TestCase):
 
 
 class TestPII(unittest.TestCase):
-    def test_cn_mobile(self):
-        f = engine.scan_text("电话 13800138000。")
-        self.assertTrue(any(x.rule == "中国大陆手机号" for x in f))
-
-    def test_cn_mobile_negatives(self):
-        """长度不对的不算。"""
-        f = engine.scan_text("编号 1380013800 and 138001380000")
-        self.assertFalse(any(x.rule == "中国大陆手机号" for x in f))
-
-    def test_cn_id_valid(self):
-        # 11010519491231002X 是公开的合法测试号
-        f = engine.scan_text("身份证 11010519491231002X")
-        self.assertTrue(any(x.rule == "中国大陆身份证号" for x in f))
-
-    def test_cn_id_invalid_checksum(self):
-        """校验位错的应当被 validator 拦掉。"""
-        f = engine.scan_text("号码 110105194912310021")
-        self.assertFalse(any(x.rule == "中国大陆身份证号" for x in f))
-
     def test_email(self):
         f = engine.scan_text("联系 zhang.wei@corp.example.com")
         self.assertTrue(any(x.rule == "电子邮箱" for x in f))
@@ -79,13 +60,15 @@ class TestPII(unittest.TestCase):
         f = engine.scan_text("联系 test@example.com")
         self.assertFalse(any(x.rule == "电子邮箱" for x in f))
 
-    def test_card_luhn_valid(self):
-        f = engine.scan_text("卡号 4539578763621486")
-        self.assertTrue(any(x.rule == "银行卡号" for x in f))
+    def test_card_number_not_flagged(self):
+        """位置类 PII 已砍 —— 订单号/测试数据误报太高。"""
+        f = engine.scan_text("编号 4539578763621486")
+        self.assertFalse(f)
 
-    def test_card_luhn_invalid(self):
-        f = engine.scan_text("编号 1234567890123456")
-        self.assertFalse(any(x.rule == "银行卡号" for x in f))
+    def test_cn_mobile_not_flagged(self):
+        f = engine.scan_text("电话 13800138000")
+        self.assertFalse(f, "手机号规则已砍")
+
 
 
 class TestInfra(unittest.TestCase):
@@ -105,10 +88,6 @@ class TestInfra(unittest.TestCase):
         f = engine.scan_text("db.corp.internal")
         self.assertTrue(any("内部主机名" in x.rule for x in f))
 
-    def test_metadata_endpoint(self):
-        f = engine.scan_text("http://169.254.169.254/latest/meta-data/")
-        self.assertTrue(any("元数据" in x.rule for x in f))
-
 
 class TestPaths(unittest.TestCase):
     def test_windows_user_path(self):
@@ -122,14 +101,13 @@ class TestPaths(unittest.TestCase):
 
 class TestRedact(unittest.TestCase):
     def test_roundtrip(self):
-        t = ("13800138000 zhang@corp.com 10.1.2.3 "
+        t = ("zhang@corp.com 10.1.2.3 "
              "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx")
         cleaned, n = engine.redact_text(t)
-        self.assertEqual(n, 4)
-        self.assertNotIn("13800138000", cleaned)
+        self.assertEqual(n, 3)
         self.assertNotIn("zhang@corp.com", cleaned)
         self.assertNotIn("sk-ant-api03", cleaned)
-        self.assertIn("PHONE_REDACTED", cleaned)
+        self.assertIn("EMAIL_REDACTED", cleaned)
 
     def test_idempotent(self):
         """已脱敏的文本再脱敏不应再变。"""
@@ -139,10 +117,10 @@ class TestRedact(unittest.TestCase):
         self.assertEqual(cleaned, t)
 
     def test_kind_filter(self):
-        t = "13800138000 sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx"
-        cleaned, n = engine.redact_text(t, kinds=["pii"])
+        t = "zhang@corp.com sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx"
+        cleaned, n = engine.redact_text(t, kinds=["secret"])
         self.assertEqual(n, 1)
-        self.assertIn("sk-ant-api03", cleaned)
+        self.assertIn("zhang@corp.com", cleaned)
 
 
 class TestScanMeta(unittest.TestCase):
@@ -151,23 +129,24 @@ class TestScanMeta(unittest.TestCase):
         self.assertEqual(f, [])
 
     def test_line_col(self):
-        f = engine.scan_text("line1\nline2 13800138000\n")
+        f = engine.scan_text("line1\nline2 10.1.2.3\n")
         self.assertTrue(f)
         self.assertEqual(f[0].line, 2)
 
     def test_min_severity(self):
-        t = "192.168.1.1"           # MED
+        t = "10.0.0.1"            # MED
         self.assertTrue(engine.scan_text(t, min_severity="LOW"))
         self.assertFalse(engine.scan_text(t, min_severity="HIGH"))
 
     def test_show_raw(self):
-        f = engine.scan_text("13800138000", show_raw=True)
-        self.assertEqual(f[0].raw, "13800138000")
-        f2 = engine.scan_text("13800138000", show_raw=False)
+        f = engine.scan_text("sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx",
+                             show_raw=True)
+        self.assertTrue(f[0].raw.startswith("sk-ant-"))
+        f2 = engine.scan_text("sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx",
+                              show_raw=False)
         self.assertEqual(f2[0].raw, "")
 
     def test_dedup_same_offset(self):
-        """同位置的重复命中应合并。"""
         t = "10.1.2.3:8080"
         f = engine.scan_text(t)
         positions = [(x.line, x.col) for x in f]
@@ -179,19 +158,6 @@ class TestRulesTable(unittest.TestCase):
         for r in R.ALL_RULES:
             r.compile()      # 不抛异常即通过
 
-    def test_validators_exist(self):
-        for r in R.ALL_RULES:
-            if r.validator:
-                self.assertIn(r.validator, R.VALIDATORS)
-
-    def test_luhn(self):
-        self.assertTrue(R.VALIDATORS["luhn"]("4539578763621486"))
-        self.assertFalse(R.VALIDATORS["luhn"]("1234567890123456"))
-
-    def test_cn_id(self):
-        self.assertTrue(R.VALIDATORS["cn_id"]("11010519491231002X"))
-        self.assertFalse(R.VALIDATORS["cn_id"]("110105194912310021"))
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
@@ -199,34 +165,6 @@ if __name__ == "__main__":
 
 class TestFalsePositives(unittest.TestCase):
     """真实代码/文档里的常见串不该被报。"""
-
-    def test_code_decorators_not_tg(self):
-        for text in ("@property", "@staticmethod", "@classmethod",
-                     "@lru_cache", "@dataclass", "@abstractmethod",
-                     "@functools.wraps", "@abc.abstractmethod"):
-            with self.subTest(t=text):
-                f = engine.scan_text(text)
-                self.assertFalse(any(x.rule == "Telegram 用户名" for x in f),
-                                 f"{text} 不该被当 TG 账号")
-
-    def test_docstring_tags_not_tg(self):
-        for text in ('"""@author: bob"""', "@version: 1.0", "@param x the x",
-                     "@returns the y", "@TODO fix", "@deprecated"):
-            with self.subTest(t=text):
-                f = engine.scan_text(text)
-                self.assertFalse(any(x.rule == "Telegram 用户名" for x in f))
-
-    def test_real_handles_caught(self):
-        for text in ("@realuser12345", "@YY520CN", "@zhang_wei_2024"):
-            with self.subTest(t=text):
-                f = engine.scan_text(text)
-                self.assertTrue(any(x.rule == "Telegram 用户名" for x in f))
-
-    def test_email_only_reports_email(self):
-        f = engine.scan_text("a@b.com")
-        names = {x.rule for x in f}
-        self.assertIn("电子邮箱", names)
-        self.assertNotIn("Telegram 用户名", names)
 
     def test_normal_python_code_clean(self):
         code = '''

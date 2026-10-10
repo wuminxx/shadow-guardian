@@ -123,16 +123,26 @@ aiopsec check -f x.log --json
 aiopsec check -f x.log --quiet       # 只输出结论，适合 CI
 ```
 
-**检测类别**（`--kind`）：
+**检测类别**（`--kind`），共 23 条：
 
 | kind | 覆盖 |
 |---|---|
-| `secret` | Anthropic/OpenAI/GitHub/AWS/Google/Slack/GitLab/HF/Stripe key、JWT、PEM 私钥、Bearer、连接串、泛化的 `password=` |
-| `pii` | 中国手机号/身份证（带校验位）/座机/车牌、邮箱、银行卡（Luhn 校验）、Telegram 用户名、IPv6 |
-| `infra` | 私有 IPv4、IP:端口、内部主机名、云元数据端点 |
-| `path` | Windows/Unix 用户路径、macOS 私密路径 |
+| `secret` (17) | Anthropic/OpenAI/GitHub/AWS/Google/Slack/GitLab/HF/Stripe key、JWT、PEM 私钥、Bearer、数据库连接串、泛化的 `password=` |
+| `pii` (1) | 邮箱 |
+| `infra` (3) | 私有 IPv4、IP:端口、内部主机名 |
+| `path` (2) | Windows/Unix 用户路径 |
 
-**降误报**：身份证走校验位，银行卡走 Luhn，RFC2606 保留域放行，占位符放行。
+**刻意不检测**（误报率高于收益）：
+
+```
+中国手机号 / 身份证 / 银行卡 / 车牌 / 座机 / Telegram 用户名
+```
+
+这些几乎不会以明文形态出现在给 AI 的文本里，但订单号、日志、
+测试数据都很像 → 误报淹没真信号。早期版本有这些规则，
+实测误报率高，已移除。真要发这类信息，手工改。
+
+**降误报**：RFC2606 保留域放行，占位符放行，同位置重复命中合并。
 
 ### `aiopsec redact` — 脱敏
 
@@ -292,7 +302,7 @@ jobs:
 
 ```bash
 cd tool
-python -m unittest discover -s tests -v     # 34 个用例
+python -m unittest discover -s tests -v     # 81 个用例
 ```
 
 ---

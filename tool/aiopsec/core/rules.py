@@ -36,60 +36,7 @@ class Rule:
 
 
 # ---------------------------------------------------------------- 校验器
-def _luhn_ok(s: str) -> bool:
-    """银行卡/信用卡 Luhn 校验，减少误报。"""
-    digits = [int(c) for c in s if c.isdigit()]
-    if len(digits) < 13:
-        return False
-    checksum = 0
-    for i, d in enumerate(reversed(digits)):
-        if i % 2 == 1:
-            d *= 2
-            if d > 9:
-                d -= 9
-        checksum += d
-    return checksum % 10 == 0
-
-
-def _cn_id_ok(s: str) -> bool:
-    """中国大陆身份证号校验位。"""
-    if len(s) != 18:
-        return False
-    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
-    check = "10X98765432"
-    try:
-        total = sum(int(s[i]) * weights[i] for i in range(17))
-    except ValueError:
-        return False
-    return check[total % 11] == s[17].upper()
-
-
-# 代码/文档里常见的 @xxx，不是 Telegram 账号
-_CODE_HANDLES = frozenset({
-    "author", "since", "deprecated", "version", "see", "link", "param",
-    "params", "return", "returns", "raise", "raises", "note", "warning",
-    "todo", "fixme", "example", "property", "staticmethod", "classmethod",
-    "functools", "abc", "override", "abstractmethod", "final", "setter",
-    "getter", "deleter", "async", "await", "def", "class", "self",
-    "type", "cast", "dataclass", "field", "typing", "contextmanager",
-    "lru_cache", "cached_property", "wraps", "main", "pytest", "click",
-})
-
-
-def _tg_handle_ok(s: str) -> bool:
-    """排除代码装饰器和 docstring 标签。"""
-    body = s.lstrip("@").lower()
-    if body in _CODE_HANDLES:
-        return False
-    return True
-
-
-VALIDATORS = {
-    "luhn": _luhn_ok,
-    "cn_id": _cn_id_ok,
-    "tg_handle": _tg_handle_ok,
-}
-
+VALIDATORS = {}
 
 # ---------------------------------------------------------------- 密钥类
 SECRET_RULES = [
@@ -140,32 +87,13 @@ SECRET_RULES = [
 
 # ---------------------------------------------------------------- 个人信息
 PII_RULES = [
-    Rule("中国大陆手机号", HIGH,
-         r"(?<![0-9])1[3-9][0-9]{9}(?![0-9])", "PHONE_REDACTED", "pii"),
-    Rule("中国大陆身份证号", HIGH,
-         r"(?<![0-9])[1-9][0-9]{5}(?:19|20)[0-9]{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12][0-9]|3[01])[0-9]{3}[0-9Xx](?![0-9])",
-         "CN_ID_REDACTED", "pii", validator="cn_id"),
+    # 只保留邮箱。位置类 PII（中国手机号/身份证/银行卡/车牌/座机）已砍：
+    #   1) 真实泄漏里极少以明文形态出现在给 AI 的文本中
+    #   2) 误报率高（订单号、日志、测试数据都像）
+    #   3) 攻击者不会用这些格式投递
     Rule("电子邮箱", MED,
          r"(?<![\w.\-])[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}(?![\w.\-])",
          "EMAIL_REDACTED", "pii"),
-    Rule("银行卡号", HIGH,
-         r"(?<![0-9])(?:[0-9]{4}[ \-]?){3}[0-9]{4}(?![0-9])", "CARD_REDACTED",
-         "pii", validator="luhn"),
-    Rule("中国大陆座机", MED,
-         r"(?<![0-9])0[0-9]{2,3}-?[0-9]{7,8}(?![0-9])", "LANDLINE_REDACTED", "pii"),
-    # Telegram 用户名：@ + 5-32 位字母数字下划线。
-    # 代码里 @xxx 太常见（@author: / @property / @staticmethod），
-    # 靠 validator 排除，而不是写变长 lookbehind（Python re 不支持）。
-    Rule("Telegram 用户名", MED,
-         r"(?<![\w@.])@[A-Za-z][A-Za-z0-9_]{4,31}(?![\w.:-])(?!\.[A-Za-z0-9_]+)",
-         "@HANDLE_REDACTED", "pii", validator="tg_handle"),
-    Rule("中国车牌号", MED,
-         r"(?<![A-Za-z0-9\u4e00-\u9fff])[京津冀晋蒙辽吉黑沪苏浙皖闽赣鲁豫鄂湘粤桂琼渝川贵云藏陕甘青宁新]"
-         r"[A-HJ-NP-Z][A-HJ-NP-Z0-9]{4,5}[A-HJ-NP-Z0-9挂学警港澳](?![A-Za-z0-9])",
-         "PLATE_REDACTED", "pii"),
-    Rule("IPv6 地址", LOW,
-         r"(?<![0-9A-Fa-f:])(?:[0-9A-Fa-f]{1,4}:){3,7}[0-9A-Fa-f]{1,4}(?![0-9A-Fa-f:])",
-         "IPV6_REDACTED", "pii"),
 ]
 
 # ---------------------------------------------------------------- 基础设施
@@ -179,11 +107,6 @@ INFRA_RULES = [
     Rule("内部主机名", MED,
          r"(?:[a-z0-9][a-z0-9\-]*\.)+(?:internal|local|corp|lan|intra|intranet|home\.arpa)(?![A-Za-z0-9.\-])",
          "INTERNAL_HOST_REDACTED", "infra"),
-    Rule("云元数据端点", HIGH,
-         r"169\.254\.169\.254", "169.254.169.254", "infra"),
-    Rule("内网/私有域名后缀", LOW,
-         r"(?<![A-Za-z0-9.\-])[a-z0-9][a-z0-9\-]*\.(?:svc|cluster\.local|internal\.cloud)(?![A-Za-z0-9.\-])",
-         "INTERNAL_SVC_REDACTED", "infra"),
 ]
 
 # ---------------------------------------------------------------- 路径
@@ -194,9 +117,6 @@ PATH_RULES = [
     Rule("Unix 用户路径", MED,
          r"/(?:home|Users)/([^/\s\"'<>|]{1,64})",
          r"/home/USER", "path"),
-    Rule("macOS 私密路径标记", LOW,
-         r"/(?:volumes|private/var/folders)/[^\s\"'<>|]{4,}",
-         r"/PATH_REDACTED", "path"),
 ]
 
 ALL_RULES: list[Rule] = SECRET_RULES + PII_RULES + INFRA_RULES + PATH_RULES

@@ -46,7 +46,7 @@ class TestExitCodes(unittest.TestCase):
 
 class TestCheckCLI(unittest.TestCase):
     def test_dirty_exit_one(self):
-        r = run_cli("check", "--quiet", stdin="tel 13800138000\n")
+        r = run_cli("check", "--quiet", stdin="ip 10.1.2.3\n")
         self.assertEqual(r.returncode, 1)
 
     def test_clean_exit_zero(self):
@@ -62,7 +62,7 @@ class TestCheckCLI(unittest.TestCase):
         self.assertIn("不存在", r.stderr)
 
     def test_json_output_valid(self):
-        r = run_cli("check", "--json", stdin="tel 13800138000\n")
+        r = run_cli("check", "--json", stdin="ip 10.1.2.3\n")
         d = json.loads(r.stdout)
         self.assertEqual(d["command"], "check")
         self.assertIn("summary", d)
@@ -70,7 +70,7 @@ class TestCheckCLI(unittest.TestCase):
 
     def test_kind_filter(self):
         r = run_cli("check", "--kind", "secret", "--json",
-                    stdin="tel 13800138000 key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx\n")
+                    stdin="ip 10.1.2.3 key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx\n")
         d = json.loads(r.stdout)
         kinds = {f["kind"] for f in d["findings"]}
         self.assertEqual(kinds, {"secret"}, "只应报 secret 类")
@@ -84,34 +84,34 @@ class TestCheckCLI(unittest.TestCase):
 
 class TestRedactCLI(unittest.TestCase):
     def test_stdout_is_clean(self):
-        r = run_cli("redact", stdin="tel 13800138000\n")
-        self.assertNotIn("13800138000", r.stdout)
-        self.assertIn("PHONE_REDACTED", r.stdout)
+        r = run_cli("redact", stdin="ip 10.1.2.3\n")
+        self.assertNotIn("10.1.2.3", r.stdout)
+        self.assertIn("PRIVATE_IP_REDACTED", r.stdout)
 
     def test_dry_run_no_output(self):
-        r = run_cli("redact", "--dry-run", stdin="tel 13800138000\n")
-        self.assertNotIn("13800138000", r.stdout)
+        r = run_cli("redact", "--dry-run", stdin="ip 10.1.2.3\n")
+        self.assertNotIn("10.1.2.3", r.stdout)
         self.assertIn("预演", r.stdout)
 
     def test_out_file(self):
         with tempfile.TemporaryDirectory() as t:
             f = Path(t) / "in.txt"
             o = Path(t) / "out.txt"
-            f.write_text("tel 13800138000\n", encoding="utf-8")
+            f.write_text("ip 10.1.2.3\n", encoding="utf-8")
             r = run_cli("redact", "-f", str(f), "-o", str(o))
             self.assertEqual(r.returncode, 0)
-            self.assertNotIn("13800138000", o.read_text(encoding="utf-8"))
+            self.assertNotIn("10.1.2.3", o.read_text(encoding="utf-8"))
 
     def test_in_place_creates_backup(self):
         with tempfile.TemporaryDirectory() as t:
             f = Path(t) / "x.txt"
-            f.write_text("tel 13800138000\n", encoding="utf-8")
+            f.write_text("ip 10.1.2.3\n", encoding="utf-8")
             r = run_cli("redact", "-f", str(f), "--in-place")
             self.assertEqual(r.returncode, 0)
-            self.assertNotIn("13800138000", f.read_text(encoding="utf-8"))
+            self.assertNotIn("10.1.2.3", f.read_text(encoding="utf-8"))
             bak = Path(str(f) + ".bak")
             self.assertTrue(bak.exists(), "应生成 .bak")
-            self.assertIn("13800138000", bak.read_text(encoding="utf-8"))
+            self.assertIn("10.1.2.3", bak.read_text(encoding="utf-8"))
 
 
 class TestEnvCLI(unittest.TestCase):
