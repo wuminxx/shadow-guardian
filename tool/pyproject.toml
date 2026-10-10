@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiopsec"
+version = "1.0.0"
+description = "AI 使用 OPSEC 工具：落盘测绘 / 泄露检查 / 脱敏 / 清理 / 加固"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "wuminxx" }]
+keywords = ["opsec", "privacy", "ai", "llm", "security", "forensics"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Security",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/wuminxx/ai-opsec-privacy"
+
+[project.scripts]
+aiopsec = "aiopsec.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["aiopsec*"]

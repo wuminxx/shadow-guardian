@@ -1,0 +1,35 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# 测试/临时
+/tmp/
+*.log
+*.bak
+*.bak.*
+
+# 本地个人配置（不要提交真实身份信息）
+.ai-pseudo
+.ai-pseudo.d/
+pseudo-identity.local*
+
+# 本地模型
+*.gguf
+*.safetensors
+models/

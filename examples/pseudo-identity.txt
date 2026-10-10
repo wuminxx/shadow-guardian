@@ -1,0 +1,68 @@
+# 假身份模板
+#
+# 用途：需要"人设"时使用，避免现场即兴编造（即兴编的容易掺真信息）。
+#
+# 用法：
+#   cp examples/pseudo-identity.txt ~/.ai-pseudo
+#   编辑填入（或让工具生成）
+#   source ~/.ai-pseudo
+#   然后引用 $PSEUDO_NAME 等变量
+#
+# 铁律：
+#   · 与真身零字符/语义关联（别用真名的变形、拼音、首字母）
+#   · 每次用同一套（或按项目分套），不要随机化到自相矛盾
+#   · 教育/工作背景也要预造完整，别留空白让模型追问
+#   · 时区与声称地点一致，否则露馅
+#   · 不同项目用不同身份（避免跨项目关联）
+
+# ---- 基础 ----
+PSEUDO_NAME=""
+PSEUDO_AGE=""
+PSEUDO_LOCATION=""          # 大区域即可，别精确到街道
+PSEUDO_TZ=""                # 必须与 LOCATION 一致，如 America/New_York
+PSEUDO_LANG=""              # 如 en_US.UTF-8
+PSEUDO_CURRENCY=""          # 如 USD
+
+# ---- 职业背景（预造完整）----
+PSEUDO_OCCUPATION=""
+PSEUDO_EDUCATION=""         # 学校类型 + 专业方向，别用真实母校
+PSEUDO_YEARS_EXP=""
+PSEUDO_SKILLS=""            # 与真实技能集错开
+
+# ---- 联系方式 ----
+PSEUDO_EMAIL=""             # 一次性邮箱服务注册的地址
+PSEUDO_CONTACT=""           # IM / 其他联系方式
+PSEUDO_HANDLE=""            # 用户名（与真身所有用户名不同）
+
+# ---- 时间线（防自相矛盾）----
+# 记录关键日期，之后所有叙述要与之一致
+PSEUDO_BIRTH_YEAR=""        # 与 PSEUDO_AGE 一致
+PSEUDO_CAREER_START=""      # 与 AGE 和 YEARS_EXP 一致
+
+# ============================================================
+# 一致性检查（填完后逐条核对）
+# ============================================================
+#
+# □ PSEUDO_AGE 与 PSEUDO_BIRTH_YEAR 一致
+# □ PSEUDO_CAREER_START 与 AGE + YEARS_EXP 一致
+# □ PSEUDO_EDUCATION 的毕业年份合理
+# □ PSEUDO_TZ 与 PSEUDO_LOCATION 指向同一区域
+# □ PSEUDO_LANG 与 PSEUDO_LOCATION 一致
+# □ PSEUDO_CURRENCY 与 PSEUDO_LOCATION 一致
+# □ 所有字段与真身无任何字符/语义关联
+# □ 所有字段与真身真实信息无因果关联（比如真学医的别假扮律师同行）
+# □ 多套身份之间无重复字段（防跨项目关联）
+#
+# ============================================================
+# 多套身份管理（按项目分）
+# ============================================================
+#
+# ~/.ai-pseudo.d/
+#   ├── project-a.env
+#   ├── project-b.env
+#   └── project-c.env
+#
+# 用法：source ~/.ai-pseudo.d/project-a.env
+#
+# 每套独立：独立邮箱、独立支付、独立用户名、独立时区设定
+# 绝不跨项目复用任何字段

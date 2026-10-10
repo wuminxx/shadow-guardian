@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/skills/ai-opsec-privacy/hooks/prompt-guard.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/skills/ai-opsec-privacy/hooks/session-banner.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

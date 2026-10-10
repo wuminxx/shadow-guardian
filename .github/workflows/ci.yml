@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (py${{ matrix.python }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.8', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run unit tests
+        working-directory: tool
+        run: python -m unittest discover -s tests -v
+
+      - name: CLI smoke test (help)
+        working-directory: tool
+        run: python -m aiopsec --help
+
+      - name: CLI smoke test (all subcommands)
+        working-directory: tool
+        shell: bash
+        run: |
+          set -e
+          for c in scan check redact shred env harden hook audit; do
+            echo "--- $c ---"
+            python -m aiopsec "$c" --help > /dev/null
+          done
+
+      - name: Functional test (check + redact)
+        working-directory: tool
+        shell: bash
+        run: |
+          set -e
+          printf 'tel 13800138000 key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx\n' > /tmp/t.txt
+          # check 应返回 1
+          if python -m aiopsec check -f /tmp/t.txt --quiet; then
+            echo "FAIL: check should have found issues"; exit 1
+          fi
+          # redact 应清掉
+          python -m aiopsec redact -f /tmp/t.txt -o /tmp/c.txt
+          if grep -q '13800138000' /tmp/c.txt; then
+            echo "FAIL: phone survived redaction"; exit 1
+          fi
+          if grep -q 'sk-ant-api03' /tmp/c.txt; then
+            echo "FAIL: key survived redaction"; exit 1
+          fi
+          echo "OK"
+
+      - name: Functional test (shred dry-run safe)
+        working-directory: tool
+        shell: bash
+        run: |
+          set -e
+          # dry-run 必须不删任何东西
+          python -m aiopsec shred > /dev/null
+          echo "OK"
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install ruff
+      - name: ruff
+        run: ruff check tool/aiopsec/ tests/ 2>/dev/null || ruff check tool/aiopsec/
