@@ -195,3 +195,53 @@ class TestRulesTable(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestFalsePositives(unittest.TestCase):
+    """真实代码/文档里的常见串不该被报。"""
+
+    def test_code_decorators_not_tg(self):
+        for text in ("@property", "@staticmethod", "@classmethod",
+                     "@lru_cache", "@dataclass", "@abstractmethod",
+                     "@functools.wraps", "@abc.abstractmethod"):
+            with self.subTest(t=text):
+                f = engine.scan_text(text)
+                self.assertFalse(any(x.rule == "Telegram 用户名" for x in f),
+                                 f"{text} 不该被当 TG 账号")
+
+    def test_docstring_tags_not_tg(self):
+        for text in ('"""@author: bob"""', "@version: 1.0", "@param x the x",
+                     "@returns the y", "@TODO fix", "@deprecated"):
+            with self.subTest(t=text):
+                f = engine.scan_text(text)
+                self.assertFalse(any(x.rule == "Telegram 用户名" for x in f))
+
+    def test_real_handles_caught(self):
+        for text in ("@realuser12345", "@YY520CN", "@zhang_wei_2024"):
+            with self.subTest(t=text):
+                f = engine.scan_text(text)
+                self.assertTrue(any(x.rule == "Telegram 用户名" for x in f))
+
+    def test_email_only_reports_email(self):
+        f = engine.scan_text("a@b.com")
+        names = {x.rule for x in f}
+        self.assertIn("电子邮箱", names)
+        self.assertNotIn("Telegram 用户名", names)
+
+    def test_normal_python_code_clean(self):
+        code = '''
+import os
+from dataclasses import dataclass
+DEFAULT = 30
+
+class Svc:
+    """服务。@author: team"""
+    @property
+    def x(self):
+        # TODO: cache
+        return os.getenv("X")
+'''
+        self.assertEqual(engine.scan_text(code), [], "正常代码应零命中")
+
+    def test_version_number_not_tg(self):
+        self.assertFalse(engine.scan_text("version @1.2.3"))

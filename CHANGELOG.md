@@ -21,7 +21,7 @@
 - `aiopsec env` — 时区 / 语言 / 出口 IP / 主机名 一致性检查
 - `aiopsec harden` — 加固配置（关遥测、限制 Copilot，浅合并 + 自动备份）
 - `aiopsec hook` — 安装 Claude Code UserPromptSubmit 拦截 + SessionStart 提示
-- 规则表 40+ 条，覆盖 secret / pii / infra / path 四类
+- 规则表 33 条，覆盖 secret / pii / infra / path 四类
 - 校验器：中国身份证校验位、银行卡 Luhn（降误报）
 - 全部子命令支持 `--json`
 - 退出码约定：`0` 通过 / `1` 发现问题 / `2` 用法错误

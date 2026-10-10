@@ -64,9 +64,30 @@ def _cn_id_ok(s: str) -> bool:
     return check[total % 11] == s[17].upper()
 
 
+# 代码/文档里常见的 @xxx，不是 Telegram 账号
+_CODE_HANDLES = frozenset({
+    "author", "since", "deprecated", "version", "see", "link", "param",
+    "params", "return", "returns", "raise", "raises", "note", "warning",
+    "todo", "fixme", "example", "property", "staticmethod", "classmethod",
+    "functools", "abc", "override", "abstractmethod", "final", "setter",
+    "getter", "deleter", "async", "await", "def", "class", "self",
+    "type", "cast", "dataclass", "field", "typing", "contextmanager",
+    "lru_cache", "cached_property", "wraps", "main", "pytest", "click",
+})
+
+
+def _tg_handle_ok(s: str) -> bool:
+    """排除代码装饰器和 docstring 标签。"""
+    body = s.lstrip("@").lower()
+    if body in _CODE_HANDLES:
+        return False
+    return True
+
+
 VALIDATORS = {
     "luhn": _luhn_ok,
     "cn_id": _cn_id_ok,
+    "tg_handle": _tg_handle_ok,
 }
 
 
@@ -132,9 +153,12 @@ PII_RULES = [
          "pii", validator="luhn"),
     Rule("中国大陆座机", MED,
          r"(?<![0-9])0[0-9]{2,3}-?[0-9]{7,8}(?![0-9])", "LANDLINE_REDACTED", "pii"),
+    # Telegram 用户名：@ + 5-32 位字母数字下划线。
+    # 代码里 @xxx 太常见（@author: / @property / @staticmethod），
+    # 靠 validator 排除，而不是写变长 lookbehind（Python re 不支持）。
     Rule("Telegram 用户名", MED,
-         r"(?<![A-Za-z0-9_@])@[A-Za-z][A-Za-z0-9_]{4,31}(?![A-Za-z0-9_])",
-         "@HANDLE_REDACTED", "pii"),
+         r"(?<![\w@.])@[A-Za-z][A-Za-z0-9_]{4,31}(?![\w.:-])(?!\.[A-Za-z0-9_]+)",
+         "@HANDLE_REDACTED", "pii", validator="tg_handle"),
     Rule("中国车牌号", MED,
          r"(?<![A-Za-z0-9\u4e00-\u9fff])[京津冀晋蒙辽吉黑沪苏浙皖闽赣鲁豫鄂湘粤桂琼渝川贵云藏陕甘青宁新]"
          r"[A-HJ-NP-Z][A-HJ-NP-Z0-9]{4,5}[A-HJ-NP-Z0-9挂学警港澳](?![A-Za-z0-9])",

@@ -181,7 +181,7 @@ cat app.log | aiopsec redact     # 脱敏
 aiopsec check -d ./src           # 递归扫目录
 ```
 
-检测 40+ 规则：Anthropic/OpenAI/GitHub/AWS/Google/Slack key、PEM 私钥、JWT、连接串、
+检测 33 规则：Anthropic/OpenAI/GitHub/AWS/Google/Slack key、PEM 私钥、JWT、连接串、
 中国手机号/身份证（带校验位）/车牌、邮箱、银行卡（Luhn）、内网 IP、内部主机名、用户路径。
 
 ### L3 网络层
